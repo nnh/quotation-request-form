@@ -30,6 +30,7 @@ function createSs(){
   const items = quotegenerator2.getItemsFromFormRequests(target);
   const res = quotegenerator2.createSpreadsheet(items);
   if (typeof(res) !== 'string'){
+    GmailApp.sendEmail(PropertiesService.getScriptProperties().getProperty('administratorEmailAddress'), 'error:quotation-request-form', `quotation-request-formでエラーが発生しました。\n${res.name}:${res.message}\n${Array.from(items)}`);
     console.log(`${res.name}:${res.message}`);
     return;
   }
