@@ -1,3 +1,9 @@
+const maxRetryCount = 2;
+/**
+ * Set the year for form entry items.
+ * @param none.
+ * @return none.
+ */
 function setYears(){
   const setYear = new SetYears();
   setYear.setCheckBox();
@@ -22,17 +28,80 @@ class SetYears{
     target.forEach(list => list.setChoices(this.yearList.map(x => list.createChoice(x))));
   }
 }
+/**
+ * Create a spreadsheet from form entries.
+ * @param none.
+ * @return none.
+ */
 function createSs(){
-  const user = Session.getActiveUser().getUserLoginId();
-  const resList = FormApp.getActiveForm().getResponses(); 
+  let retryUserCount = 0;
+  let user;
+  let resError = null;
+  while (retryUserCount < maxRetryCount){
+    try{
+      user = Session.getActiveUser().getUserLoginId();
+      resError = null;
+      break;
+    } catch (error){
+      resError = error;
+      Utilities.sleep(1000);
+    }
+    retryUserCount++;
+  }
+  if (resError !== null){
+    sendMailResult_(user, 'error:quotation-request-form', `セッション取得エラーが発生したためquotation-request-formが異常終了しました。`);
+    return;
+  }
+  let retrygetResponsesCount = 0;
+  let resList;
+  while (retrygetResponsesCount < maxRetryCount){
+    try{
+      resList = FormApp.getActiveForm().getResponses(); 
+      resError = null;
+      break;
+    } catch (error){
+      resError = error;
+      Utilities.sleep(1000);
+    }
+    retrygetResponsesCount++;
+  }
+  if (resError !== null){
+    sendMailResult_(user, 'error:quotation-request-form', `レスポンス取得エラーが発生したためquotation-request-formが異常終了しました。`);
+    return;
+  }
   // Retrieve the most recent input information.
   const target = resList.filter(x => x.getRespondentEmail() === user).filter((_, idx, arr) => idx === arr.length - 1)[0];
   const items = quotegenerator2.getItemsFromFormRequests(target);
   const res = quotegenerator2.createSpreadsheet(items);
   if (typeof(res) !== 'string'){
-    GmailApp.sendEmail(PropertiesService.getScriptProperties().getProperty('administratorEmailAddress'), 'error:quotation-request-form', `quotation-request-formでエラーが発生しました。\n${res.name}:${res.message}\n${Array.from(items)}`);
+    sendMailResult_(PropertiesService.getScriptProperties().getProperty('administratorEmailAddress'), 'error:quotation-request-form', `quotation-request-formでエラーが発生しました。\n${res.name}:${res.message}\n${Array.from(items)}`);
     console.log(`${res.name}:${res.message}`);
     return;
   }
-  GmailApp.sendEmail(user, 'test', `${res}の作成が完了しました。Googleドライブのマイドライブをご確認ください。`);
+  sendMailResult_(user, 'test', `${res}の作成が完了しました。Googleドライブのマイドライブをご確認ください。`);
+}
+/**
+ * Send email.
+ * @param {string} mailAddress Email address to be sent to.
+ * @param {string} title Email Subject.
+ * @param {string} body Email Body.
+ * @return none.
+ */
+function sendMailResult_(mailAddress, title, body){
+  let retryCount = 0;
+  let res;
+  while (retryCount < maxRetryCount){
+    try{
+      GmailApp.sendEmail(mailAddress, title, body);
+      res = null;
+      break;
+    } catch (error){
+      res = error;
+      Utilities.sleep(1000);
+    }
+    retryCount++;
+  }
+  if (res !== null){
+    console.log(`${res.name}:${res.message}`);    
+  }
 }
