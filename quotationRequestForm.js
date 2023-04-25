@@ -34,24 +34,7 @@ class SetYears{
  * @return none.
  */
 function createSs(){
-  let retryUserCount = 0;
-  let user;
   let resError = null;
-  while (retryUserCount < maxRetryCount){
-    try{
-      user = Session.getActiveUser().getUserLoginId();
-      resError = null;
-      break;
-    } catch (error){
-      resError = error;
-      Utilities.sleep(1000);
-    }
-    retryUserCount++;
-  }
-  if (resError !== null){
-    sendMailResult_(user, 'error:quotation-request-form', `セッション取得エラーが発生したためquotation-request-formが異常終了しました。`);
-    return;
-  }
   let retrygetResponsesCount = 0;
   let resList;
   while (retrygetResponsesCount < maxRetryCount){
@@ -66,19 +49,22 @@ function createSs(){
     retrygetResponsesCount++;
   }
   if (resError !== null){
-    sendMailResult_(user, 'error:quotation-request-form', `レスポンス取得エラーが発生したためquotation-request-formが異常終了しました。`);
+    sendMailResult_(PropertiesService.getScriptProperties().getProperty('administratorEmailAddress'), 'error:quotation-request-form', `レスポンス取得エラーが発生したためquotation-request-formが異常終了しました。`);
     return;
   }
   // Retrieve the most recent input information.
-  const target = resList.filter(x => x.getRespondentEmail() === user).filter((_, idx, arr) => idx === arr.length - 1)[0];
+  const target = resList[resList.length - 1];
+  const editUrl = target.getEditResponseUrl();
+  const user = target.getRespondentEmail();
   const items = quotegenerator2.getItemsFromFormRequests(target);
   const res = quotegenerator2.createSpreadsheet(items);
   if (typeof(res) !== 'string'){
-    sendMailResult_(PropertiesService.getScriptProperties().getProperty('administratorEmailAddress'), 'error:quotation-request-form', `quotation-request-formでエラーが発生しました。\n${res.name}:${res.message}\n${Array.from(items)}`);
+    sendMailResult_(`${user}, ${PropertiesService.getScriptProperties().getProperty('administratorEmailAddress')}`, 'error:quotation-request-form', `createSpreadsheetでエラーが発生しました。下記URLから内容の修正等を行って再度送信をお試しください。\n${editUrl}\n\n${res.name}:${res.message}\n${Array.from(items)}`);
     console.log(`${res.name}:${res.message}`);
     return;
   }
-  sendMailResult_(user, 'test', `${res}の作成が完了しました。Googleドライブのマイドライブをご確認ください。`);
+  const [title, ss] = res.split('|||');
+  sendMailResult_(user, 'test', `${title}の作成が完了しました。\n${ss}\n入力内容の修正は下記URLから行うことができます。\n${editUrl}`);
 }
 /**
  * Send email.
